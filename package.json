@@ -1,0 +1,33 @@
+{
+  "name": "angular1-webpack-typescript-starter",
+  "version": "1.0.0",
+  "description": "Angular 1.x, webpack 2, typescript starter app",
+  "main": "src/app/app.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pure-js/angular1-webpack-typescript-starter.git"
+  },
+  "keywords": [
+    "angular",
+    "angular",
+    "1",
+    "webpack",
+    "webpack",
+    "2",
+    "typescript",
+    "typescript",
+    "2"
+  ],
+  "author": "pure-js",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/pure-js/angular1-webpack-typescript-starter/issues"
+  },
+  "homepage": "https://github.com/pure-js/angular1-webpack-typescript-starter#readme",
+  "dependencies": {
+    "angular": "^1.6.2"
+  }
+}
