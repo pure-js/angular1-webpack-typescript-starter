@@ -1,2 +1,20 @@
 
-node_modules/
+# Node modules
+node_modules
+npm-debug.log
+
+# WebStorm
+.idea
+
+# Dev & Distribution
+.tmp
+dist
+
+# Bower
+bower_components
+
+# Deploy
+.publish
+
+# OS X
+.DS_Store
