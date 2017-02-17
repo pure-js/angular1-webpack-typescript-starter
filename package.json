@@ -4,7 +4,8 @@
   "description": "Angular 1.x, webpack 2, typescript starter app",
   "main": "src/app/app.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "server:dev": "webpack-dev-server --config config/webpack.dev.js --open --progress --profile --watch --content-base src/"
   },
   "repository": {
     "type": "git",
@@ -29,5 +30,9 @@
   "homepage": "https://github.com/pure-js/angular1-webpack-typescript-starter#readme",
   "dependencies": {
     "angular": "^1.6.2"
+  },
+  "devDependencies": {
+    "webpack": "^2.2.1",
+    "webpack-dev-server": "^2.3.0"
   }
 }
