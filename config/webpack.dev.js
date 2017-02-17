@@ -1,253 +1,224 @@
-const helpers = require('./helpers');
-const webpackMerge = require('webpack-merge'); // used to merge webpack configs
-const webpackMergeDll = webpackMerge.strategy({plugins: 'replace'});
-const commonConfig = require('./webpack.common.js'); // the settings that are common to prod and dev
+'use strict';
+
+// Modules
+var webpack = require('webpack');
+var autoprefixer = require('autoprefixer');
+var HtmlWebpackPlugin = require('html-webpack-plugin');
+var ExtractTextPlugin = require('extract-text-webpack-plugin');
+var CopyWebpackPlugin = require('copy-webpack-plugin');
 
 /**
- * Webpack Plugins
+ * Env
+ * Get npm lifecycle event to identify the environment
  */
-const AddAssetHtmlPlugin = require('add-asset-html-webpack-plugin');
-const DefinePlugin = require('webpack/lib/DefinePlugin');
-const NamedModulesPlugin = require('webpack/lib/NamedModulesPlugin');
-const LoaderOptionsPlugin = require('webpack/lib/LoaderOptionsPlugin');
+var ENV = process.env.npm_lifecycle_event;
+var isTest = ENV === 'test' || ENV === 'test-watch';
+var isProd = ENV === 'build';
 
-/**
- * Webpack Constants
- */
-const ENV = process.env.ENV = process.env.NODE_ENV = 'development';
-const HOST = process.env.HOST || 'localhost';
-const PORT = process.env.PORT || 3000;
-const HMR = helpers.hasProcessFlag('hot');
-const METADATA = webpackMerge(commonConfig({env: ENV}).metadata, {
-  host: HOST,
-  port: PORT,
-  ENV: ENV,
-  HMR: HMR
-});
+module.exports = function makeWebpackConfig() {
+  /**
+   * Config
+   * Reference: http://webpack.github.io/docs/configuration.html
+   * This is the object where all configuration gets set
+   */
+  var config = {};
 
+  /**
+   * Entry
+   * Reference: http://webpack.github.io/docs/configuration.html#entry
+   * Should be an empty object if it's generating a test build
+   * Karma will set this when it's a test build
+   */
+  config.entry = isTest ? void 0 : {
+      app: './src/app/app.js'
+    };
 
-const DllBundlesPlugin = require('webpack-dll-bundles-plugin').DllBundlesPlugin;
+  /**
+   * Output
+   * Reference: http://webpack.github.io/docs/configuration.html#output
+   * Should be an empty object if it's generating a test build
+   * Karma will handle setting it up for you when it's a test build
+   */
+  config.output = isTest ? {} : {
+      // Absolute output directory
+      path: __dirname + '/dist',
 
-/**
- * Webpack configuration
- *
- * See: http://webpack.github.io/docs/configuration.html#cli
- */
-module.exports = function (options) {
-  return webpackMerge(commonConfig({env: ENV}), {
+      // Output path from the view of the page
+      // Uses webpack-dev-server in development
+      publicPath: isProd ? '/' : 'http://localhost:8080/',
 
-    /**
-     * Developer tool to enhance debugging
-     *
-     * See: http://webpack.github.io/docs/configuration.html#devtool
-     * See: https://github.com/webpack/docs/wiki/build-performance#sourcemaps
-     */
-    devtool: 'cheap-module-source-map',
+      // Filename for entry points
+      // Only adds hash in build mode
+      filename: isProd ? '[name].[hash].js' : '[name].bundle.js',
 
-    /**
-     * Options affecting the output of the compilation.
-     *
-     * See: http://webpack.github.io/docs/configuration.html#output
-     */
-    output: {
+      // Filename for non-entry points
+      // Only adds hash in build mode
+      chunkFilename: isProd ? '[name].[hash].js' : '[name].bundle.js'
+    };
 
-      /**
-       * The output directory as absolute path (required).
-       *
-       * See: http://webpack.github.io/docs/configuration.html#output-path
-       */
-      path: helpers.root('dist'),
+  /**
+   * Devtool
+   * Reference: http://webpack.github.io/docs/configuration.html#devtool
+   * Type of sourcemap to use per build type
+   */
+  if (isTest) {
+    config.devtool = 'inline-source-map';
+  }
+  else if (isProd) {
+    config.devtool = 'source-map';
+  }
+  else {
+    config.devtool = 'eval-source-map';
+  }
 
-      /**
-       * Specifies the name of each output file on disk.
-       * IMPORTANT: You must not specify an absolute path here!
-       *
-       * See: http://webpack.github.io/docs/configuration.html#output-filename
-       */
-      filename: '[name].bundle.js',
+  /**
+   * Loaders
+   * Reference: http://webpack.github.io/docs/configuration.html#module-loaders
+   * List: http://webpack.github.io/docs/list-of-loaders.html
+   * This handles most of the magic responsible for converting modules
+   */
 
-      /**
-       * The filename of the SourceMaps for the JavaScript files.
-       * They are inside the output.path directory.
-       *
-       * See: http://webpack.github.io/docs/configuration.html#output-sourcemapfilename
-       */
-      sourceMapFilename: '[file].map',
+  // Initialize module
+  config.module = {
+    rules: [{
+      // JS LOADER
+      // Reference: https://github.com/babel/babel-loader
+      // Transpile .js files using babel-loader
+      // Compiles ES6 and ES7 into ES5 code
+      test: /\.js$/,
+      loader: 'babel-loader',
+      exclude: /node_modules/
+    }, {
+      // CSS LOADER
+      // Reference: https://github.com/webpack/css-loader
+      // Allow loading css through js
+      //
+      // Reference: https://github.com/postcss/postcss-loader
+      // Postprocess your css with PostCSS plugins
+      test: /\.css$/,
+      // Reference: https://github.com/webpack/extract-text-webpack-plugin
+      // Extract css files in production builds
+      //
+      // Reference: https://github.com/webpack/style-loader
+      // Use style-loader in development.
 
-      /** The filename of non-entry chunks as relative path
-       * inside the output.path directory.
-       *
-       * See: http://webpack.github.io/docs/configuration.html#output-chunkfilename
-       */
-      chunkFilename: '[id].chunk.js',
-
-      library: 'ac_[name]',
-      libraryTarget: 'var',
-    },
-
-    module: {
-
-      rules: [
-       {
-         test: /\.ts$/,
-         use: [
-           {
-             loader: 'tslint-loader',
-             options: {
-               configFile: 'tslint.json'
-             }
-           }
-         ],
-         exclude: [/\.(spec|e2e)\.ts$/]
-       },
-
-        /*
-         * css loader support for *.css files (styles directory only)
-         * Loads external css styles into the DOM, supports HMR
-         *
-         */
-        {
-          test: /\.css$/,
-          use: ['style-loader', 'css-loader'],
-          include: [helpers.root('src', 'styles')]
-        },
-
-        /*
-         * sass loader support for *.scss files (styles directory only)
-         * Loads external sass styles into the DOM, supports HMR
-         *
-         */
-        {
-          test: /\.scss$/,
-          use: ['style-loader', 'css-loader', 'sass-loader'],
-          include: [helpers.root('src', 'styles')]
-        },
-
-      ]
-
-    },
-
-    plugins: [
-
-      /**
-       * Plugin: DefinePlugin
-       * Description: Define free variables.
-       * Useful for having development builds with debug logging or adding global constants.
-       *
-       * Environment helpers
-       *
-       * See: https://webpack.github.io/docs/list-of-plugins.html#defineplugin
-       */
-      // NOTE: when adding more properties, make sure you include them in custom-typings.d.ts
-      new DefinePlugin({
-        'ENV': JSON.stringify(METADATA.ENV),
-        'HMR': METADATA.HMR,
-        'process.env': {
-          'ENV': JSON.stringify(METADATA.ENV),
-          'NODE_ENV': JSON.stringify(METADATA.ENV),
-          'HMR': METADATA.HMR,
-        }
-      }),
-
-      new DllBundlesPlugin({
-        bundles: {
-          polyfills: [
-            'core-js',
-            {
-              name: 'zone.js',
-              path: 'zone.js/dist/zone.js'
-            },
-            {
-              name: 'zone.js',
-              path: 'zone.js/dist/long-stack-trace-zone.js'
-            },
+      loader: isTest ? 'null-loader' : ExtractTextPlugin.extract({
+          fallbackLoader: 'style-loader',
+          loader: [
+            {loader: 'css-loader', query: {sourceMap: true}},
+            {loader: 'postcss-loader'}
           ],
-          vendor: [
-            '@angular/platform-browser',
-            '@angular/platform-browser-dynamic',
-            '@angular/core',
-            '@angular/common',
-            '@angular/forms',
-            '@angular/http',
-            '@angular/router',
-            '@angularclass/hmr',
-            'rxjs',
-          ]
-        },
-        dllDir: helpers.root('dll'),
-        webpackConfig: webpackMergeDll(commonConfig({env: ENV}), {
-          devtool: 'cheap-module-source-map',
-          plugins: []
         })
-      }),
+    }, {
+      // ASSET LOADER
+      // Reference: https://github.com/webpack/file-loader
+      // Copy png, jpg, jpeg, gif, svg, woff, woff2, ttf, eot files to output
+      // Rename the file using the asset hash
+      // Pass along the updated reference to your code
+      // You can add here any file extension you want to get copied to your output
+      test: /\.(png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$/,
+      loader: 'file-loader'
+    }, {
+      // HTML LOADER
+      // Reference: https://github.com/webpack/raw-loader
+      // Allow loading html through js
+      test: /\.html$/,
+      loader: 'raw-loader'
+    }]
+  };
 
-      /**
-       * Plugin: AddAssetHtmlPlugin
-       * Description: Adds the given JS or CSS file to the files
-       * Webpack knows about, and put it into the list of assets
-       * html-webpack-plugin injects into the generated html.
-       *
-       * See: https://github.com/SimenB/add-asset-html-webpack-plugin
-       */
-      new AddAssetHtmlPlugin([
-        { filepath: helpers.root(`dll/${DllBundlesPlugin.resolveFile('polyfills')}`) },
-        { filepath: helpers.root(`dll/${DllBundlesPlugin.resolveFile('vendor')}`) }
-      ]),
-
-      /**
-       * Plugin: NamedModulesPlugin (experimental)
-       * Description: Uses file names as module name.
-       *
-       * See: https://github.com/webpack/webpack/commit/a04ffb928365b19feb75087c63f13cadfc08e1eb
-       */
-      // new NamedModulesPlugin(),
-
-      /**
-       * Plugin LoaderOptionsPlugin (experimental)
-       *
-       * See: https://gist.github.com/sokra/27b24881210b56bbaff7
-       */
-      new LoaderOptionsPlugin({
-        debug: true,
-        options: {
-
-        }
-      }),
-
-    ],
-
-    /**
-     * Webpack Development Server configuration
-     * Description: The webpack-dev-server is a little node.js Express server.
-     * The server emits information about the compilation state to the client,
-     * which reacts to those events.
-     *
-     * See: https://webpack.github.io/docs/webpack-dev-server.html
-     */
-    devServer: {
-      port: METADATA.port,
-      host: METADATA.host,
-      historyApiFallback: true,
-      watchOptions: {
-        aggregateTimeout: 300,
-        poll: 1000
+  // ISTANBUL LOADER
+  // https://github.com/deepsweet/istanbul-instrumenter-loader
+  // Instrument JS files with istanbul-lib-instrument for subsequent code coverage reporting
+  // Skips node_modules and files that end with .test
+  if (isTest) {
+    config.module.rules.push({
+      enforce: 'pre',
+      test: /\.js$/,
+      exclude: [
+        /node_modules/,
+        /\.spec\.js$/
+      ],
+      loader: 'istanbul-instrumenter-loader',
+      query: {
+        esModules: true
       }
-    },
+    })
+  }
 
-    /*
-     * Include polyfills or mocks for various node stuff
-     * Description: Node configuration
-     *
-     * See: https://webpack.github.io/docs/configuration.html#node
-     */
-    node: {
-      global: true,
-      crypto: 'empty',
-      process: true,
-      module: false,
-      clearImmediate: false,
-      setImmediate: false
-    }
+  /**
+   * PostCSS
+   * Reference: https://github.com/postcss/autoprefixer-core
+   * Add vendor prefixes to your css
+   */
+  // NOTE: This is now handled in the `postcss.config.js`
+  //       webpack2 has some issues, making the config file necessary
 
-  });
-}
+  /**
+   * Plugins
+   * Reference: http://webpack.github.io/docs/configuration.html#plugins
+   * List: http://webpack.github.io/docs/list-of-plugins.html
+   */
+  config.plugins = [
+    new webpack.LoaderOptionsPlugin({
+      test: /\.scss$/i,
+      options: {
+        postcss: {
+          plugins: [autoprefixer]
+        }
+      }
+    })
+  ];
+
+  // Skip rendering index.html in test mode
+  if (!isTest) {
+    // Reference: https://github.com/ampedandwired/html-webpack-plugin
+    // Render index.html
+    config.plugins.push(
+      new HtmlWebpackPlugin({
+        template: './src/public/index.html',
+        inject: 'body'
+      }),
+
+      // Reference: https://github.com/webpack/extract-text-webpack-plugin
+      // Extract css files
+      // Disabled when in test mode or not in build mode
+      new ExtractTextPlugin({filename: 'css/[name].css', disable: !isProd, allChunks: true})
+    )
+  }
+
+  // Add build specific plugins
+  if (isProd) {
+    config.plugins.push(
+      // Reference: http://webpack.github.io/docs/list-of-plugins.html#noerrorsplugin
+      // Only emit files when there are no errors
+      new webpack.NoErrorsPlugin(),
+
+      // Reference: http://webpack.github.io/docs/list-of-plugins.html#dedupeplugin
+      // Dedupe modules in the output
+      new webpack.optimize.DedupePlugin(),
+
+      // Reference: http://webpack.github.io/docs/list-of-plugins.html#uglifyjsplugin
+      // Minify all javascript, switch loaders to minimizing mode
+      new webpack.optimize.UglifyJsPlugin(),
+
+      // Copy assets from the public folder
+      // Reference: https://github.com/kevlened/copy-webpack-plugin
+      new CopyWebpackPlugin([{
+        from: __dirname + '/src/public'
+      }])
+    )
+  }
+
+  /**
+   * Dev server configuration
+   * Reference: http://webpack.github.io/docs/configuration.html#devserver
+   * Reference: http://webpack.github.io/docs/webpack-dev-server.html
+   */
+  config.devServer = {
+    contentBase: './src/public',
+    stats: 'minimal'
+  };
+
+  return config;
+}();
